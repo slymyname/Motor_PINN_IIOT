@@ -2,7 +2,7 @@ import serial, time, math
 import torch, torch.nn as nn, torch.optim as optim
 import numpy as np
 
-PORT = '/dev/ttyS0' # Change to 'COM2' or 'COM3' if on Windows
+PORT = '/dev/ttyS0' # Ensure this matches your dashboard/Proteus port
 BAUD = 115200 
 BASELINE_FILE = 'motor_baseline.pt'
 
@@ -23,15 +23,19 @@ class PINN_Engine(nn.Module):
         self.net = nn.Sequential(SIREN_Layer(1, 64, True), SIREN_Layer(64, 64), nn.Linear(64, 1))
         self.raw_c = nn.Parameter(torch.tensor([0.0], requires_grad=True))
         self.raw_k = nn.Parameter(torch.tensor([0.0], requires_grad=True))
+        
     def get_params(self):
         return torch.sigmoid(self.raw_c)*2.0, 1.0+(torch.sigmoid(self.raw_k)*4.0)
+        
     def forward(self, t): return self.net(t)
+    
     def loss(self, t):
         t.requires_grad = True
         x = self.forward(t)
         dx_dt = torch.autograd.grad(x, t, torch.ones_like(x), create_graph=True)[0]
         d2x_dt2 = torch.autograd.grad(dx_dt, t, torch.ones_like(dx_dt), create_graph=True)[0]
         c, k = self.get_params()
+        # Physics loss: Damped Harmonic Oscillator residual
         return torch.mean((d2x_dt2 + c*dx_dt + k*50*x)**2)
 
 # --- 2. CALIBRATION ROUTINE ---
@@ -49,6 +53,7 @@ def run_calibration():
         
         raw_data = None
         current_friction = 0.0
+        expected_peak = 1.0
         
         # 1. Capture exactly ONE valid frame
         while raw_data is None:
@@ -59,13 +64,16 @@ def run_calibration():
                     rms = int(line[7:9], 16)
                     current_friction = 1.00 - (temp * 0.0005)
                     
+                    # THE FIX: Calculate the exact peak amplitude for dynamic scaling
+                    expected_peak = rms * 1.414
+                    
                     # Reconstruct the wave
-                    wave, amp, decay = [], rms*1.414, current_friction
+                    wave, amp, decay = [], expected_peak, current_friction
                     for i in range(50):
                         wave.append(int(amp * math.sin(i * 0.314)))
                         amp *= decay
                     raw_data = wave
-                    print(f"[+] Frame Captured! Temp: {temp}C | RMS: {rms}")
+                    print(f"[+] Frame Captured! Temp: {temp}C | RMS: {rms} | Peak: {expected_peak:.1f}")
         ser.close()
 
         # 2. Spin up the AI Engine
@@ -76,10 +84,13 @@ def run_calibration():
         
         ai_brain.train()
         t_data = torch.linspace(-1, 1, 50).view(-1, 1)
-        x_data = torch.tensor(raw_data, dtype=torch.float32).view(-1, 1) / 512.0
         
-        # 3. Deep Offline Training (250 Epochs)
-        for epoch in range(250):
+        # THE FIX: Dynamically normalize the data using the real expected_peak
+        x_data = torch.tensor(raw_data, dtype=torch.float32).view(-1, 1) / expected_peak
+        
+        # 3. Deep Offline Training (Capped at 500 Epochs)
+        total_epochs = 10000
+        for epoch in range(total_epochs):
             optimizer.zero_grad()
             l_data = 100.0 * torch.mean((ai_brain(t_data) - x_data)**2)
             l_phys = ai_brain.loss(t_data)
@@ -87,8 +98,8 @@ def run_calibration():
             torch.nn.utils.clip_grad_norm_(ai_brain.parameters(), 1.0)
             optimizer.step()
             
-            if epoch % 50 == 0:
-                print(f"    Epoch {epoch}/250 completed...")
+            if (epoch + 1) % 100 == 0:
+                print(f"    Epoch {epoch + 1}/{total_epochs} completed... Loss: {(l_data + l_phys).item():.4f}")
 
         # 4. Save the Model
         torch.save({
