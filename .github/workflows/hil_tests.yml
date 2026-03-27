@@ -12,11 +12,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: List Files (Debug)
+        run: ls -la 
+
       - name: Run Hardware-in-the-Loop Diagnostics
         run: |
-          # Use the absolute path to YOUR existing virtual environment
-          # Replace 'syki' with your actual username if different
+          # 1. Activate your local environment
           source /home/syki/Desktop/canpinnmonitor/venv/bin/activate
           
-          # Run the tests
-          pytest test_cerberus_hil.py -v -s
+          # 2. Run the CORRECTly named file
+          pytest test_motor_hil.py -v -s
