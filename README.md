@@ -8,23 +8,28 @@ End-to-end prototype: **Arduino Uno (FreeRTOS)** exposes motor-style telemetry o
 
 ```mermaid
 flowchart LR
-  subgraph mcu [MOTOR_CAN_PINN.ino]
+  subgraph mcu [MOTOR_CAN_PINN.ino / ATmega328P]
     A[TaskAcquireData]
     B[TaskAnalyzeAndCommunicate]
     C[TaskCommandListener]
-    A -->|binary semaphore| B
-    C -->|mutex: temp override| A
-    B -->|SLCAN TX 0x100| UART[UART 115200]
-    UART --> C
+    A -->|vSemaphoreGive| B
+    C -->|xSemaphoreTake/Give Mutex| A
+    B -->|SLCAN TX: t1004| UART[UART 115200]
+    UART -.->|SLCAN RX: t050 / t051| C
   end
-  subgraph host [Linux / PC]
+
+  subgraph host [Linux / PC Desktop]
     CAL[calibrate_twin.py]
     DASH[dashboard_edge.py]
     HIL[test_motor_hil.py]
     PLOT[plot_motor.py]
+    
+    CAL -->|pinn_weights.pth| DASH
+    DASH -->|motor_log_*.csv| PLOT
   end
-  UART <--> CAL
+
   UART <--> DASH
+  UART <--> HIL
   UART <--> HIL
   DASH -->|motor_log_*.csv| PLOT
 ```
