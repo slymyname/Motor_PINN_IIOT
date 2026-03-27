@@ -6,22 +6,17 @@ on:
 
 jobs:
   test_hardware:
-    runs-on: self-hosted # <--- This is the magic line that points to your PC!
+    runs-on: self-hosted
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Python Environment
-        run: |
-          # We use your existing local setup
-          python3 -m venv venv
-          source venv/bin/activate
-          pip install --upgrade pip
-          pip install pytest pyserial torch numpy PyQt5 pyqtgraph
-
       - name: Run Hardware-in-the-Loop Diagnostics
         run: |
-          source venv/bin/activate
-          # PROTEUS MUST BE RUNNING FOR THIS TO PASS
+          # Use the absolute path to YOUR existing virtual environment
+          # Replace 'syki' with your actual username if different
+          source /home/syki/Desktop/canpinnmonitor/venv/bin/activate
+          
+          # Run the tests
           pytest test_cerberus_hil.py -v -s
