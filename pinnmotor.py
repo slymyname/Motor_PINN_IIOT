@@ -112,7 +112,7 @@ class SerialWorker(QThread):
 class MotorDashboard(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("CERBERUS IIoT - Predictive Maintenance")
+        self.setWindowTitle("MOTOR_PINN_IIoT - Predictive Maintenance")
         self.setGeometry(100, 100, 1250, 750) 
         self.setStyleSheet("background-color: #1e1e2e; color: white;")
         

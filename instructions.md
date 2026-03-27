@@ -19,4 +19,4 @@ test code:
 sudo apt install python3-pytest
 pytest -v -s pytest_hil.py 
 
-pytest test_cerberus_hil.py -v -s
+pytest test_hil.py -v -s

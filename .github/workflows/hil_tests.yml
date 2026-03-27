@@ -1,4 +1,4 @@
-name: Cerberus HIL Test Suite
+name: MOTOR HIL Test Suite
 
 on:
   push:
